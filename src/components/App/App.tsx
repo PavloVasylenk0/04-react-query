@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { fetchMovies } from "../../services/movieService";
-import type { Movie, MoviesResponse } from "../../types/movie";
-import toast from "react-hot-toast";
+import type { Movie } from "../../types/movie";
+import toast, { Toaster } from "react-hot-toast";
 import SearchBar from "../SearchBar/SearchBar";
 import MovieGrid from "../MovieGrid/MovieGrid";
 import Loader from "../Loader/Loader";
@@ -17,10 +17,10 @@ export default function App() {
   const [page, setPage] = useState(1);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
 
-  const { data, isLoading, isError } = useQuery<
-    MoviesResponse,
+  const { data, isPending, isError, isSuccess } = useQuery<
+    Awaited<ReturnType<typeof fetchMovies>>,
     Error,
-    MoviesResponse,
+    Awaited<ReturnType<typeof fetchMovies>>,
     [string, string, number]
   >({
     queryKey: ["movies", query, page],
@@ -31,7 +31,12 @@ export default function App() {
 
   const hasShownNoResultsToast = useRef(false);
   useEffect(() => {
+    hasShownNoResultsToast.current = false;
+  }, [query]);
+
+  useEffect(() => {
     if (
+      isSuccess &&
       data &&
       data.results.length === 0 &&
       query &&
@@ -42,17 +47,17 @@ export default function App() {
     } else if (data && data.results.length > 0) {
       hasShownNoResultsToast.current = false;
     }
-  }, [data, query]);
+  }, [data, query, isSuccess]);
 
   const hasShownErrorToast = useRef(false);
   useEffect(() => {
-    if (isError && !hasShownErrorToast.current) {
+    if (isError && query && !hasShownErrorToast.current) {
       toast.error("Failed to fetch movies");
       hasShownErrorToast.current = true;
     } else if (!isError) {
       hasShownErrorToast.current = false;
     }
-  }, [isError]);
+  }, [isError, query]);
 
   const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
@@ -75,10 +80,10 @@ export default function App() {
     <div className={styles.container}>
       <SearchBar onSubmit={handleSearch} />
 
-      {isLoading && <Loader />}
-      {isError && <ErrorMessage />}
+      {isPending && query && <Loader />}
+      {isError && query && <ErrorMessage />}
 
-      {data?.results && (
+      {isSuccess && data?.results && (
         <>
           {data.total_pages > 1 && (
             <ReactPaginate
@@ -115,6 +120,8 @@ export default function App() {
       {selectedMovie && (
         <MovieModal movie={selectedMovie} onClose={handleCloseModal} />
       )}
+
+      <Toaster />
     </div>
   );
 }
